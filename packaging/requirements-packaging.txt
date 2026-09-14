@@ -1,0 +1,5 @@
+# Install these ON WINDOWS before running packaging/build_windows.bat.
+# They could not be installed in the Linux build sandbox for this project
+# (no route to these specific packages from that environment).
+pyinstaller>=6.0
+pywebview>=5.0

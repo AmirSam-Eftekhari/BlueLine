@@ -1,0 +1,6 @@
+flask>=3.0
+click>=8.1
+psutil>=5.9
+# Test suite uses Python's stdlib `unittest` (see tests/) so no extra
+# dependency is required to run it. If you have pytest available in your
+# own environment, `pytest tests/` also works against the same test files.
