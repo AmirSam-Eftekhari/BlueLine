@@ -87,7 +87,6 @@ def scan(target, profile, db, out):
 @click.option("--db", default=DEFAULT_DB_PATH)
 def report(scan_id, fmt, out, db):
     """Generate a report for a previously completed SCAN_ID."""
-    from app.core.models import Finding, ScanResult, TargetProfile, StageResult, AnalyzerCapability
     from app.reporting.pdf_report import PdfGenerationError, generate_pdf_report
     store = ScanStore(db)
     data = store.load(scan_id)

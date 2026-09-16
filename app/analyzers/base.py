@@ -79,6 +79,9 @@ def default_registry() -> AnalyzerRegistry:
     from app.analyzers.web_api import WebApiAnalyzer
     from app.analyzers.binary_analysis import BinaryAnalyzer
     from app.analyzers.rust_static import RustStaticAnalyzer
+    from app.analyzers.kotlin_static import KotlinStaticAnalyzer
+    from app.analyzers.swift_static import SwiftStaticAnalyzer
+    from app.analyzers.scala_static import ScalaStaticAnalyzer
 
     reg = AnalyzerRegistry()
     reg.register(PythonStaticAnalyzer())
@@ -88,6 +91,9 @@ def default_registry() -> AnalyzerRegistry:
     reg.register(RubyStaticAnalyzer())
     reg.register(PhpStaticAnalyzer())
     reg.register(RustStaticAnalyzer())
+    reg.register(KotlinStaticAnalyzer())
+    reg.register(SwiftStaticAnalyzer())
+    reg.register(ScalaStaticAnalyzer())
     reg.register(CCppStaticAnalyzer())
     reg.register(DependencyAnalyzer())
     reg.register(ConfigurationAnalyzer())

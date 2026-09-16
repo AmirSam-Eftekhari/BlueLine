@@ -16,7 +16,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from app.core.models import Finding, ScanConfig, ScanResult, Severity, TargetProfile, ValidationStatus
+from app.core.models import ScanResult, Severity
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans (

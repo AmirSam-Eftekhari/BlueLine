@@ -145,6 +145,124 @@ when you can't get a fully faithful test environment, get as close as
 you honestly can, root-cause anything that looks wrong instead of
 guessing, and say plainly what you could and couldn't verify.
 
+## Dogfooding: BlueLine scanning its own source code
+
+Late in development, BlueLine was pointed at its own real product
+code (`app/` and `ui/`, excluding the deliberately-vulnerable
+`test-targets/` fixtures) — not as a demo, but as a genuine self-test.
+Results:
+
+- **Python analyzer: 0 findings** across 42 real source files. Not a
+  scanning failure — verified separately that `TargetDiscovery` saw all
+  42 files before concluding this was a clean result, not a silent miss.
+- **JavaScript analyzer: 17 MEDIUM findings**, every single one the
+  `JS-INNERHTML` pattern rule flagging a `.innerHTML =` assignment in
+  `app.js`. Each of the 17 was reviewed by hand, tracing every
+  interpolated value back to its source: all 17 either assign a fully
+  static string (no interpolation at all) or interpolate only values
+  already passed through the `esc()` HTML-escaping helper defined at
+  the top of `app.js`. None were real vulnerabilities.
+
+This is a genuinely useful result in both directions. It confirms the
+JS analyzer is working exactly as documented — it flags every
+`innerHTML` assignment uniformly because a regex-based, single-line
+matcher cannot verify escaping across a multi-line template literal, so
+that judgment is deliberately left to the human reviewer rather than
+guessed at. And it validates that `app.js`'s own escaping discipline
+was actually followed consistently everywhere, which is exactly the
+kind of thing that's easy to get right in 16 places and wrong in the
+17th without a systematic check. The rule's remediation text was
+updated to name this specific pattern explicitly, since it's now a
+confirmed common source of reviewable-but-safe findings, not a
+hypothetical one.
+
+This exercise is now a permanent automated test
+(`tests/test_self_scan.py`), not a one-time manual check — it re-runs
+BlueLine against its own current source on every test run and fails if
+the Python analyzer ever finds anything, or if any HIGH/CRITICAL
+finding appears anywhere in BlueLine's own code. A future change that
+introduces a real issue is caught the same way a user's target's issues
+would be.
+
+## A real resource leak found during a final quality-gate audit
+
+Section 49 of the original spec calls for a final audit pass before
+declaring anything done. Running one late in this project's
+development — checking for dead imports, unused code, and leftover
+temp files, not just re-running the test suite — found something the
+tests hadn't caught: `DynamicRunner.run()` created a fresh
+`tempfile.mkdtemp()` sandbox directory for every single execution and
+never removed it. Unlike Python's `tempfile.TemporaryDirectory()`
+context manager, `mkdtemp()` does not auto-clean, and nothing was
+calling `shutil.rmtree()` afterward.
+
+This had already produced over 24,000 leftover empty directories in
+`/tmp` from this project's own development and testing by the time it
+was caught — a single 100-case fuzzing campaign alone adds 100 more
+every time it runs, unboundedly, for the lifetime of whatever machine
+runs BlueLine. Every existing test still passed the whole time, because
+none of them asserted anything about `/tmp`'s contents after a run —
+this is exactly the kind of gap a dedicated audit pass catches that
+routine test runs don't.
+
+Fixed by wrapping execution in `try/finally` and cleaning up the
+directory BlueLine itself created — but explicitly NOT a directory the
+caller passed in via `cwd=`, since that one isn't BlueLine's to delete.
+Both behaviors are pinned in `tests/test_activity_monitoring.py`
+(`test_run_does_not_leak_its_own_temp_directory`, which counts real
+directories in the real temp folder before and after five runs, and
+`test_run_does_not_delete_a_caller_provided_cwd`).
+
+The same audit pass also found and removed several genuinely dead
+imports across the codebase (a leftover `from ... import Finding as _F`
+that was never used after a refactor, an entire unused import line in
+`cli.py` left over from before `_scan_result_from_dict` was factored
+out, and a handful of others) — checked with Python's own `ast` module
+walking every file in `app/`, not by hand, and re-verified by
+re-importing every single module afterward to confirm nothing broke.
+
+## Behavior-guided fuzzing: a real feedback loop, and a real bug in it
+
+The original fuzzing engine was flat: one static candidate batch
+(boundary values, malformed strings, mutations of the raw seeds),
+executed once, no feedback. The spec calls for a fuzzer that "learns
+from execution outcomes... and prioritizes interesting inputs" — this
+was implemented as *behavior-guided* generational mutation: after each
+generation, any input whose execution produced a behavior signature
+(classification + exit code + an output-content prefix) not seen from
+any prior input becomes a seed for further mutation in the next
+generation.
+
+This is explicitly NOT code-coverage-guided fuzzing (AFL-style) — that
+needs compile-time instrumentation of the target, which is out of scope
+for "point BlueLine at an arbitrary target you didn't build." It's a
+lighter-weight technique, and its value was proven empirically, not
+assumed: a two-stage bug was built (crashes only if input is both over
+200 bytes AND contains a null byte — two conditions that never coexist
+in the flat static candidate list, which has them as separate,
+independent candidates). Head-to-head against the identical target
+(`tests/test_fuzzing_generational.py`), the old flat approach found it
+in 0/5 trials; the new generational approach found it in 5/5.
+
+Getting there caught a real bug in the first implementation attempt:
+the initial "behavior signature" bucketed output by length
+(`len(stdout) // 50`), on the theory that trivial byte-level output
+differences shouldn't each count as "new" behavior. Tested against the
+staged-bug target above, this MISSED the bug — the two distinct
+program branches printed `"stage1_only\n"` (12 bytes) and
+`"no_stage1\n"` (10 bytes), both landing in the same length bucket
+(`0`), so the signature couldn't tell them apart and the feedback loop
+never triggered. Fixed by using an actual content prefix
+(`stdout[:60]`) instead of a length bucket. That in turn introduces a
+different real tradeoff, also caught by testing rather than assumed
+away: a target that echoes its input back verbatim would make nearly
+every mutated case look like a "new" signature, since the echoed
+content differs by definition — so corpus growth is capped at
+`MAX_INTERESTING_SEEDS_PER_GENERATION` (25) per generation, verified
+with a dedicated test against exactly that kind of echo-style target
+to confirm the campaign still completes within its case budget instead
+of ballooning.
+
 ## Accessibility: checked, not assumed
 
 The spec called for real accessibility (keyboard navigation, visible

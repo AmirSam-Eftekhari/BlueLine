@@ -208,10 +208,10 @@
         <div class="section-title">Known Limitations (this build)</div>
         <div class="card">
           <ul style="margin:0; padding-left:20px; color:var(--text-secondary);">
-            <li>JavaScript/TypeScript, Java, Go, Ruby, PHP, and Rust analysis are heuristic/pattern-based, not full parsers.</li>
+            <li>JavaScript/TypeScript, Java, Go, Ruby, PHP, Rust, Kotlin, Swift, and Scala analysis are heuristic/pattern-based, not full parsers.</li>
             <li>C/C++ source analysis is experimental pattern-matching on a small set of unsafe calls.</li>
             <li>Binary analysis: ELF is fully parsed and validated; PE gets header metadata only (no imports); Mach-O gets string extraction only.</li>
-            <li>No Kotlin, Swift, or Scala analyzers yet (detected, but marked unsupported).</li>
+            <li>No analyzers yet for niche languages (Dart, Elixir, Haskell, C#, Perl, etc.) — detected, but marked unsupported.</li>
             <li>Dependency checks use a small local curated sample, not a live vulnerability feed.</li>
             <li>Fuzzing is black-box (no code-coverage feedback loop).</li>
             <li>Web/API analysis is passive (headers/cookies/CORS/transport) — no auth or injection testing against live endpoints.</li>

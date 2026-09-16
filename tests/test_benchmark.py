@@ -23,10 +23,13 @@ from app.analyzers.dependency import DependencyAnalyzer
 from app.analyzers.go_static import GoStaticAnalyzer
 from app.analyzers.java_static import JavaStaticAnalyzer
 from app.analyzers.js_static import JavaScriptStaticAnalyzer
+from app.analyzers.kotlin_static import KotlinStaticAnalyzer
 from app.analyzers.php_static import PhpStaticAnalyzer
 from app.analyzers.python_static import PythonStaticAnalyzer
 from app.analyzers.ruby_static import RubyStaticAnalyzer
 from app.analyzers.rust_static import RustStaticAnalyzer
+from app.analyzers.scala_static import ScalaStaticAnalyzer
+from app.analyzers.swift_static import SwiftStaticAnalyzer
 from app.core.models import ScanConfig
 from app.targets.discovery import TargetDiscovery
 
@@ -95,6 +98,26 @@ GROUND_TRUTH = [
     ("vulnerable-rust", "main.rs", 20, "RUST-SQL-FORMAT"),
     ("vulnerable-rust", "main.rs", 24, "RUST-UNWRAP-EXTERNAL"),
     ("vulnerable-rust", "main.rs", 28, "RUST-TRANSMUTE"),
+    ("vulnerable-kotlin", "App.kt", 5, "KT-HARDCODED-SECRET"),
+    ("vulnerable-kotlin", "App.kt", 8, "KT-RUNTIME-EXEC"),
+    ("vulnerable-kotlin", "App.kt", 12, "KT-OBJ-DESERIALIZE"),
+    ("vulnerable-kotlin", "App.kt", 17, "KT-WEAK-HASH"),
+    ("vulnerable-kotlin", "App.kt", 22, "KT-WEAK-CIPHER"),
+    ("vulnerable-kotlin", "App.kt", 27, "KT-SQL-TEMPLATE"),
+    ("vulnerable-kotlin", "App.kt", 31, "KT-FORCE-UNWRAP-EXTERNAL"),
+    ("vulnerable-swift", "App.swift", 3, "SWIFT-HARDCODED-SECRET"),
+    ("vulnerable-swift", "App.swift", 6, "SWIFT-PROCESS-EXEC"),
+    ("vulnerable-swift", "App.swift", 11, "SWIFT-WEAK-HASH"),
+    ("vulnerable-swift", "App.swift", 15, "SWIFT-SQL-INTERP"),
+    ("vulnerable-swift", "App.swift", 19, "SWIFT-USERDEFAULTS-SECRET"),
+    ("vulnerable-swift", "App.swift", 23, "SWIFT-FORCE-UNWRAP-EXTERNAL"),
+    ("vulnerable-scala", "App.scala", 5, "SCALA-HARDCODED-SECRET"),
+    ("vulnerable-scala", "App.scala", 8, "SCALA-OBJ-DESERIALIZE"),
+    ("vulnerable-scala", "App.scala", 13, "SCALA-WEAK-HASH"),
+    ("vulnerable-scala", "App.scala", 18, "SCALA-SQL-INTERP"),
+    ("vulnerable-scala", "App.scala", 27, "SCALA-PROCESS-EXEC"),
+    ("vulnerable-scala", "App.scala", 31, "SCALA-INSECURE-RANDOM"),
+    ("vulnerable-scala", "App.scala", 35, "SCALA-UNSAFE-GET"),
 ]
 
 
@@ -108,12 +131,15 @@ class TestDetectionBenchmark(unittest.TestCase):
         ruby_analyzer = RubyStaticAnalyzer()
         php_analyzer = PhpStaticAnalyzer()
         rust_analyzer = RustStaticAnalyzer()
+        kotlin_analyzer = KotlinStaticAnalyzer()
+        swift_analyzer = SwiftStaticAnalyzer()
+        scala_analyzer = ScalaStaticAnalyzer()
         config = ScanConfig.for_profile("standard")
 
         all_findings_by_fixture = {}
         for fixture in ("vulnerable-python", "vulnerable-javascript", "vulnerable-c",
                         "vulnerable-java", "vulnerable-go", "vulnerable-ruby", "vulnerable-php",
-                        "vulnerable-rust"):
+                        "vulnerable-rust", "vulnerable-kotlin", "vulnerable-swift", "vulnerable-scala"):
             path = str(ROOT / fixture)
             profile = TargetDiscovery().discover(path)
             findings = []
@@ -125,6 +151,9 @@ class TestDetectionBenchmark(unittest.TestCase):
             findings += ruby_analyzer.run(profile, config)
             findings += php_analyzer.run(profile, config)
             findings += rust_analyzer.run(profile, config)
+            findings += kotlin_analyzer.run(profile, config)
+            findings += swift_analyzer.run(profile, config)
+            findings += scala_analyzer.run(profile, config)
             all_findings_by_fixture[fixture] = findings
 
         detected = 0

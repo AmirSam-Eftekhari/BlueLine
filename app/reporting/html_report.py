@@ -13,7 +13,7 @@ from __future__ import annotations
 import html
 from datetime import datetime, timezone
 
-from app.core.models import ScanResult, Severity
+from app.core.models import ScanResult
 from app.reporting.charts import coverage_bars_svg, severity_donut_svg, severity_legend_svg
 
 SEVERITY_COLORS = {

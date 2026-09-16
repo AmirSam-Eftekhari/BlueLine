@@ -45,7 +45,13 @@ RULES = [
     dict(id="JS-INNERHTML", pattern=re.compile(r"\.innerHTML\s*="), title="Direct innerHTML assignment",
          category="Cross-Site Scripting", subcategory="DOM XSS", severity=Severity.MEDIUM, confidence=55,
          impact="Assigning unsanitized content to innerHTML can lead to DOM-based XSS.",
-         remediation="Use textContent for plain text, or a sanitizer (DOMPurify) before setting HTML.",
+         remediation="Use textContent for plain text, or a sanitizer (DOMPurify) before setting HTML. "
+                     "If every interpolated value here already goes through an HTML-escaping helper "
+                     "(commonly named esc()/escapeHtml()) or the assignment is a static string with no "
+                     "interpolation at all, this specific instance is likely a false positive — this "
+                     "check can't see past the single matched line to confirm that across a multi-line "
+                     "template, so it flags every innerHTML assignment uniformly and leaves that "
+                     "judgment to you.",
          risk=RiskFactors(impact=6, exploitability=5, exposure=6, confidence=55, reproducibility=5)),
     dict(id="JS-DOCWRITE", pattern=re.compile(r"document\.write\s*\("), title="Use of document.write()",
          category="Cross-Site Scripting", subcategory="DOM XSS", severity=Severity.LOW, confidence=50,

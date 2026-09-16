@@ -98,6 +98,34 @@ class TestActivityMonitoring(unittest.TestCase):
             obs = runner.run([sys.executable, str(script)], monitor_activity=True)
             self.assertEqual(obs.classification, "normal")
 
+    def test_run_does_not_leak_its_own_temp_directory(self):
+        # Regression: DynamicRunner used to create a fresh
+        # tempfile.mkdtemp() sandbox per run and never clean it up —
+        # a single 100-case fuzzing campaign left 100 empty directories
+        # behind in /tmp, unboundedly, for the lifetime of the machine.
+        import glob
+        import os as _os
+        before = set(glob.glob(_os.path.join(tempfile.gettempdir(), "blueline_run_*")))
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "quiet.py"
+            script.write_text("print('hi')\n")
+            runner = DynamicRunner(timeout_seconds=5)
+            for _ in range(5):
+                runner.run([sys.executable, str(script)])
+        after = set(glob.glob(_os.path.join(tempfile.gettempdir(), "blueline_run_*")))
+        self.assertEqual(after - before, set(),
+                          "DynamicRunner.run() leaked its own temp sandbox directory")
+
+    def test_run_does_not_delete_a_caller_provided_cwd(self):
+        # The cleanup fix must only remove directories DynamicRunner
+        # itself created via mkdtemp() — never a cwd the caller explicitly passed.
+        with tempfile.TemporaryDirectory() as caller_dir:
+            script = Path(caller_dir) / "quiet.py"
+            script.write_text("print('hi')\n")
+            runner = DynamicRunner(timeout_seconds=5)
+            runner.run([sys.executable, str(script)], cwd=caller_dir)
+            self.assertTrue(Path(caller_dir).exists(), "Runner deleted a caller-provided cwd")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -44,8 +44,11 @@ extension is.
 | Ruby | `PARTIAL_SUPPORT` | Regex/line-pattern based, 9 rules |
 | PHP | `PARTIAL_SUPPORT` | Regex/line-pattern based, 9 rules |
 | Rust | `PARTIAL_SUPPORT` | Regex/line-pattern based, 7 rules |
+| Kotlin | `PARTIAL_SUPPORT` | Regex/line-pattern based, 8 rules |
+| Swift | `PARTIAL_SUPPORT` | Regex/line-pattern based, 6 rules |
+| Scala | `PARTIAL_SUPPORT` | Regex/line-pattern based, 7 rules |
 | C / C++ | `EXPERIMENTAL` | Pattern-matching on 6 dangerous libc calls only, confidence capped at 50% |
-| Kotlin, Swift, Scala, etc. | `UNSUPPORTED` | Detected by file extension where recognized, but no analyzer runs — never silently skipped, always shown as unsupported |
+| Dart, Elixir, Haskell, C#, Perl, etc. | `UNSUPPORTED` | Detected by file extension where recognized, but no analyzer runs — never silently skipped, always shown as unsupported |
 
 Why the split between `FULL_SUPPORT` and `PARTIAL_SUPPORT`: Python's
 analyzer uses a real parser and understands actual program structure

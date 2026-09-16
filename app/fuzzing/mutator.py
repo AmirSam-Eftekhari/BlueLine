@@ -12,7 +12,6 @@ adversarial input that trip up naive input handling.
 from __future__ import annotations
 
 import random
-import string
 
 BOUNDARY_INTS = [-1, 0, 1, 127, 128, 255, 256, 32767, 32768, 65535, 65536,
                  2**31 - 1, 2**31, 2**32 - 1, -(2**31), -(2**63)]

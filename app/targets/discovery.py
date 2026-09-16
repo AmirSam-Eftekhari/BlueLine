@@ -35,6 +35,10 @@ EXT_LANGUAGE_MAP = {
     ".rb": "Ruby",
     ".rs": "Rust",
     ".php": "PHP",
+    ".kt": "Kotlin",
+    ".kts": "Kotlin",
+    ".swift": "Swift",
+    ".scala": "Scala",
     ".sh": "Shell",
 }
 
@@ -346,6 +350,15 @@ class TargetDiscovery:
         if "Rust" in profile.languages:
             caps.append(AnalyzerCapability("Rust Static Analysis", CapabilityLevel.PARTIAL_SUPPORT,
                                             "Heuristic/regex-based; no real parser"))
+        if "Kotlin" in profile.languages:
+            caps.append(AnalyzerCapability("Kotlin Static Analysis", CapabilityLevel.PARTIAL_SUPPORT,
+                                            "Heuristic/regex-based; no real parser"))
+        if "Swift" in profile.languages:
+            caps.append(AnalyzerCapability("Swift Static Analysis", CapabilityLevel.PARTIAL_SUPPORT,
+                                            "Heuristic/regex-based; no real parser"))
+        if "Scala" in profile.languages:
+            caps.append(AnalyzerCapability("Scala Static Analysis", CapabilityLevel.PARTIAL_SUPPORT,
+                                            "Heuristic/regex-based; no real parser"))
         if profile.package_managers:
             caps.append(AnalyzerCapability("Dependency Analysis", CapabilityLevel.PARTIAL_SUPPORT,
                                             "Checked against a small curated local vulnerability sample, "
@@ -371,7 +384,8 @@ class TargetDiscovery:
                                             "vulnerability scanner — no auth/session/injection testing "
                                             "against live endpoints in this build."))
         for lang in profile.languages:
-            if lang not in ("Python", "JavaScript", "TypeScript", "C", "C++", "Java", "Go", "Ruby", "PHP", "Rust"):
+            if lang not in ("Python", "JavaScript", "TypeScript", "C", "C++", "Java", "Go", "Ruby", "PHP",
+                            "Rust", "Kotlin", "Swift", "Scala"):
                 caps.append(AnalyzerCapability(f"{lang} Static Analysis", CapabilityLevel.UNSUPPORTED,
                                                 "No analyzer implemented yet"))
         return caps

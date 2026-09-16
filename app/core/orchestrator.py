@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import threading
 import traceback
-from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from app.analyzers.base import AnalyzerRegistry, default_registry
@@ -197,7 +196,6 @@ class ScanOrchestrator:
 
     # ---------------------------------------------------------------------
     def _run_dynamic(self, profile: TargetProfile, config: ScanConfig):
-        from app.analyzers.dependency import Finding as _F  # noqa: reuse Finding type
         runner = DynamicRunner(timeout_seconds=config.dynamic_timeout_seconds)
         findings: list[Finding] = []
         runs = 0
@@ -246,11 +244,15 @@ class ScanOrchestrator:
                             target=profile.target_path, classification=anomaly.classification,
                             occurrence_count=anomaly.occurrence_count)
         log_structured("runtime", "Fuzzing campaign complete", target=profile.target_path,
-                        total_cases_run=campaign.total_cases_run, distinct_anomalies=len(campaign.anomalies))
+                        total_cases_run=campaign.total_cases_run, distinct_anomalies=len(campaign.anomalies),
+                        generations_run=campaign.generations_run,
+                        interesting_inputs_found=campaign.interesting_inputs_found)
         return findings, {
             "total_cases_run": campaign.total_cases_run,
             "cases_per_second": campaign.cases_per_second,
             "distinct_anomalies": len(campaign.anomalies),
+            "generations_run": campaign.generations_run,
+            "interesting_inputs_found": campaign.interesting_inputs_found,
         }
 
     @staticmethod

@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass, field
-from pathlib import Path
 
 ELF_MAGIC = b"\x7fELF"
 

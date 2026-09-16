@@ -19,12 +19,12 @@ Everything below is implemented and covered by an automated test in
   ~15 rule classes (injection, insecure deserialization, weak crypto,
   hardcoded secrets, path traversal, Flask misconfig, etc.), with basic
   same-function taint tracking for SQL-injection detection.
-- **JavaScript/TypeScript, Java, Go, Ruby, PHP, and Rust static
-  analysis** (`PARTIAL_SUPPORT`) — pattern-based, not full parsers (see
-  Limitations), each with 7-10 real rules covering injection, weak
-  crypto, hardcoded secrets, and language-specific issues (TLS
-  misconfig, XXE, LFI, unsafe deserialization, object injection,
-  unsafe/transmute, etc.).
+- **JavaScript/TypeScript, Java, Go, Ruby, PHP, Rust, Kotlin, Swift, and
+  Scala static analysis** (`PARTIAL_SUPPORT`) — pattern-based, not full
+  parsers (see Limitations), each with 6-10 real rules covering
+  injection, weak crypto, hardcoded secrets, and language-specific
+  issues (TLS misconfig, XXE, LFI, unsafe deserialization, object
+  injection, unsafe/transmute, force-unwrap panics, etc.).
 - **C/C++ static analysis** (`EXPERIMENTAL`) — pattern-matching on a
   small set of classically dangerous libc calls, deliberately low
   confidence.
@@ -65,7 +65,14 @@ Everything below is implemented and covered by an automated test in
   `psutil` polling against the real running process, validated against
   real subprocesses that actually open a file and actually connect to a
   local TCP listener, both correctly detected end-to-end through the
-  full orchestrator.
+  full orchestrator. Fuzzing is behavior-guided across generations: an
+  input that reaches an observably new program behavior gets mutated
+  further in the next generation instead of every generation only
+  mutating the original static seeds — proven, not just implemented, by
+  a head-to-head test against a deliberately staged two-condition bug
+  where the old flat approach found it in 0/5 trials and the new
+  generational approach found it reliably (see
+  `tests/test_fuzzing_generational.py`).
 - **Risk engine** — transparent, documented formula (see
   `app/core/risk.py`); severity and confidence are always shown
   separately, never conflated.
@@ -172,21 +179,30 @@ current limitations of this build:
    flagged has NOT been verified safe — it may simply not be in the
    sample. Wire `VulnerabilityFeed` to a real source (OSV.dev, GitHub
    Advisory DB) for production use.
-4. **Fuzzing is black-box** — no code-coverage feedback loop. It will
-   reliably find bugs reachable by its mutation corpus (boundary values,
-   malformed structures, oversized/null-byte input, etc.) but not bugs
-   that need a specific, non-obvious input to reach. Fuzzing also does
-   NOT monitor file/network activity (only single-run Dynamic Analysis
-   does) — a deliberate tradeoff, since polling every one of potentially
-   thousands of fuzz cases would add meaningful overhead.
+4. **Fuzzing has no code-coverage feedback** (no compile-time
+   instrumentation of the target) — but it IS behavior-guided across
+   generations, mutating inputs that reach a new observable program
+   behavior rather than only ever mutating the original static seeds.
+   It will reliably find bugs reachable by its mutation corpus (boundary
+   values, malformed structures, oversized/null-byte input, etc.) and
+   staged bugs reachable by combining two of those in sequence, but not
+   bugs that need a specific, non-obvious input with no observable
+   intermediate signal to reach. A target that echoes its input back
+   verbatim can make many inputs look "new" to the behavior-guided
+   corpus; growth is capped per generation to bound the resulting
+   overhead rather than let it consume the whole time budget. Fuzzing
+   also does NOT monitor file/network activity (only single-run Dynamic
+   Analysis does) — a deliberate tradeoff, since polling every one of
+   potentially thousands of fuzz cases would add meaningful overhead.
 5. **File/network activity monitoring is polling-based** (every 30ms via
    `psutil`), not a kernel-level hook (no ptrace/eBPF) — a file opened
    and closed faster than the poll interval can be missed. This is a
    real, stated limitation, not a hidden one.
-6. **No Kotlin, Swift, or Scala analyzers** (Python, JS/TS, Java, Go,
-   Ruby, PHP, Rust, and C/C++ now have analyzers) — these are detected
-   by target discovery but explicitly marked `UNSUPPORTED`, never
-   silently skipped.
+6. **No analyzers for niche/less common languages** (Dart, Elixir,
+   Haskell, C#, Perl, etc.) — 11 languages now have real analyzers
+   (Python full; JS/TS, Java, Go, Ruby, PHP, Rust, Kotlin, Swift, Scala
+   partial; C/C++ experimental). Anything else is detected by target
+   discovery but explicitly marked `UNSUPPORTED`, never silently skipped.
 7. **Binary analysis: ELF is fully parsed and validated; PE gets header
    metadata only (no import table); Mach-O gets string extraction only**
    — see `docs/SUPPORTED_TARGETS.md` for the exact breakdown and why.

@@ -31,7 +31,6 @@ import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional
 
 try:
@@ -147,7 +146,18 @@ class DynamicRunner:
 
     def run(self, command: list[str], input_data: Optional[bytes] = None,
             cwd: Optional[str] = None, monitor_activity: bool = False) -> ExecutionObservation:
+        # Only clean up the temp directory WE created — if the caller
+        # passed an explicit cwd, that's their directory to manage, not ours.
+        owns_work_dir = cwd is None
         work_dir = cwd or tempfile.mkdtemp(prefix="blueline_run_")
+        try:
+            return self._run_inner(command, input_data, work_dir, monitor_activity)
+        finally:
+            if owns_work_dir:
+                shutil.rmtree(work_dir, ignore_errors=True)
+
+    def _run_inner(self, command: list[str], input_data: Optional[bytes],
+                    work_dir: str, monitor_activity: bool) -> ExecutionObservation:
         started = time.monotonic()
         timed_out = False
         try:

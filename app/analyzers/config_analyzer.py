@@ -4,7 +4,6 @@ Configuration analyzer — Dockerfiles, .env files, generic YAML/config files.
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
