@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🔵 BlueLine
+<img src="./ui/static/assets/blueline_256.png" width="110" alt="BlueLine logo" />
+
+# BlueLine
 
 ### Universal Security & Reliability Assessment Platform
 
@@ -26,7 +28,7 @@
 **BlueLine** is an offline-first security and reliability assessment platform for:
 
 ```text
-Source repositories   Scripts   Executables   Live Web Targets
+Source repositories    Scripts    Executables    Live Web Targets
 ```
 
 BlueLine discovers what a target actually is, determines which analysis capabilities genuinely apply, runs them, correlates their results, and produces evidence-backed findings.
@@ -43,7 +45,7 @@ That distinction matters.
 
 BlueLine therefore reports not only **what it found**, but also **what it tested and what it could not test**.
 
-**No target data leaves your machine.**
+**No target data is uploaded to a remote BlueLine service.**
 
 ---
 
@@ -52,8 +54,11 @@ BlueLine therefore reports not only **what it found**, but also **what it tested
 ### 🧠 The Core Idea
 
 > **Don't silently skip.**
+
 > **Don't fabricate intelligence.**
+
 > **Don't hide failures.**
+
 > **Don't call it verified without verification.**
 
 </div>
@@ -142,20 +147,20 @@ BlueLine therefore reports not only **what it found**, but also **what it tested
                                       │
                                       ▼
                          ┌─────────────────────────┐
-                         │    TARGET DISCOVERY     │
+                         │     TARGET DISCOVERY    │
                          │ Language · Build System  │
                          │ Package · Entry Point   │
                          └────────────┬────────────┘
                                       │
                                       ▼
-                   ┌────────────────────────────────────┐
-                   │          ORCHESTRATION             │
-                   └───────┬────────┬────────┬──────────┘
-                           │        │        │
-             ┌─────────────┘        │        └─────────────┐
-             ▼                      ▼                      ▼
+                  ┌────────────────────────────────────┐
+                  │          ORCHESTRATION              │
+                  └───────┬────────┬────────┬──────────┘
+                          │        │        │
+            ┌─────────────┘        │        └─────────────┐
+            ▼                      ▼                      ▼
       ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-      │   STATIC    │       │   DYNAMIC   │       │   BINARY    │
+      │    STATIC   │       │   DYNAMIC   │       │    BINARY   │
       │   ANALYSIS  │       │   ANALYSIS  │       │   ANALYSIS  │
       └──────┬──────┘       └──────┬──────┘       └──────┬──────┘
              │                     │                     │
@@ -165,22 +170,22 @@ BlueLine therefore reports not only **what it found**, but also **what it tested
                      ┌────────────┐  ┌────────────┐
                      │  FUZZING   │  │  WEB/API   │
                      └─────┬──────┘  └─────┬──────┘
-                           │                │
-                           └───────┬────────┘
+                           │               │
+                           └───────┬───────┘
                                    ▼
                          ┌─────────────────────┐
                          │ FINDING CORRELATION │
                          │ Deduplicate · Merge │
                          └──────────┬──────────┘
                                     │
-                    ┌───────────────┼────────────────┐
-                    ▼               ▼                ▼
-              ┌──────────┐   ┌────────────┐   ┌────────────┐
-              │   RISK   │   │  COVERAGE  │   │ VALIDATION │
-              │  ENGINE  │   │   ENGINE   │   │   STATUS   │
-              └────┬─────┘   └─────┬──────┘   └─────┬──────┘
-                   │               │                │
-                   └───────────────┼────────────────┘
+                      ┌─────────────┼─────────────┐
+                      ▼             ▼             ▼
+                ┌──────────┐ ┌────────────┐ ┌────────────┐
+                │   RISK   │ │  COVERAGE  │ │ VALIDATION │
+                │  ENGINE  │ │   ENGINE   │ │   STATUS   │
+                └────┬─────┘ └─────┬──────┘ └─────┬──────┘
+                     │             │              │
+                     └─────────────┼──────────────┘
                                    ▼
                          ┌─────────────────────┐
                          │      REPORTING      │
@@ -250,7 +255,7 @@ The analyzer is deliberately **read-only**.
 Allowed methods:
 
 ```text
-GET   HEAD   OPTIONS
+GET    HEAD    OPTIONS
 ```
 
 Checks include:
@@ -273,14 +278,17 @@ No authentication attacks, session attacks, injection testing, or state-changing
 
 ## ELF
 
-BlueLine contains a native ELF parser implemented using Python's standard-library `struct`.
+BlueLine contains a built-in ELF parser implemented using Python's standard-library `struct`.
 
 It extracts:
 
 ```text
 Architecture
+
 PIE / non-PIE
+
 Stripped / non-stripped
+
 Dynamic library dependencies
 ```
 
@@ -288,9 +296,13 @@ Validation was performed against `readelf` and `file` using five real binaries:
 
 ```text
 Normal
+
 Static
+
 Stripped
+
 PIE
+
 Non-PIE
 ```
 
@@ -333,18 +345,21 @@ BlueLine executes targets under controlled subprocess conditions:
 
 ```text
 CPU limits
+
 Memory limits
+
 Timeout handling
+
 Process-group isolation
 ```
 
 Runtime activity can also be monitored.
 
-### File activity
+### File Activity
 
 A real subprocess opening a file was detected end-to-end.
 
-### Network activity
+### Network Activity
 
 A real subprocess connecting to a local TCP listener was also detected end-to-end.
 
@@ -384,7 +399,7 @@ Instead, it promotes inputs that produce **new observable behavior**.
              YES          NO
               │            │
               ▼            ▼
-        Next Generation   Discard
+        Next Generation  Discard
 ```
 
 The generational strategy was tested against a deliberately staged two-condition bug.
@@ -423,12 +438,12 @@ Dynamic Finding    Fuzz Finding
        └───────┬───────┘
                ▼
        ┌────────────────┐
-       │ Single Root    │
-       │ Issue          │
+       │  Single Root   │
+       │     Issue      │
        └────────────────┘
 ```
 
-A planted crash was independently detected by both static/runtime paths and merged into one:
+A planted crash was independently detected by both **dynamic analysis and fuzzing** and merged into one:
 
 ```text
 CONFIRMED
@@ -505,7 +520,7 @@ The storage layer is:
 * Independent of the executable location
 * Independent of the current working directory
 
-Windows:
+On Windows:
 
 ```text
 %LOCALAPPDATA%\BlueLine
@@ -515,17 +530,17 @@ This allows the packaged application to remain a true standalone executable.
 
 ```text
 BlueLine.exe
-     │
-     ├── can be moved
-     ├── can run from read-only locations
-     └── does not require a companion data folder
+    │
+    ├── can be moved
+    ├── can run from read-only locations
+    └── does not require a companion data folder
 ```
 
 Scans can be deleted individually or cleared completely.
 
 ```bash
-blueline delete <scan_id>
-blueline delete --all
+python -m app.cli delete <scan_id>
+python -m app.cli delete --all
 ```
 
 ---
@@ -548,7 +563,9 @@ It records things such as:
 
 ```text
 Finding ID
+
 Category
+
 Location
 ```
 
@@ -556,7 +573,9 @@ but does **not** leak:
 
 ```text
 Secret values
+
 Finding evidence
+
 Sensitive target contents
 ```
 
@@ -611,12 +630,19 @@ The UI includes:
 
 ```text
 Target Setup
+
 Scan Profiles
+
 Findings
+
 Severity Breakdown
+
 Coverage
+
 History
+
 Settings
+
 Reports
 ```
 
@@ -748,26 +774,47 @@ The suite covers:
 
 ```text
 Target discovery
+
 Static analysis
+
 Binary parsing
+
 Corrupted binaries
+
 Dependency detection
+
 Web/API checks
+
 Dynamic execution
+
 Fuzzing
+
 Generational fuzzing
+
 Finding correlation
+
 Risk calculation
+
 Coverage
+
 Persistence
+
 Concurrency
+
 Structured logging
+
 HTML reporting
+
 PDF reporting
+
 Accessibility
+
 CLI behavior
+
 Windows packaging
+
 Analyzer failure isolation
+
 Detection benchmarks
 ```
 
@@ -781,14 +828,15 @@ test-targets/
 
 # 📚 Documentation
 
-| Document                    | Purpose                                    |
-| :-------------------------- | :----------------------------------------- |
-| `docs/ARCHITECTURE.md`      | Architecture and analyzer plugin interface |
-| `docs/CLI.md`               | Complete command reference                 |
-| `docs/SECURITY_MODEL.md`    | Isolation and threat model                 |
-| `docs/FINDINGS_AND_RISK.md` | Risk, severity, confidence and validation  |
-| `docs/SUPPORTED_TARGETS.md` | Capability matrix                          |
-| `docs/TROUBLESHOOTING.md`   | Common issues                              |
+| Document                             | Purpose                                    |
+| :----------------------------------- | :----------------------------------------- |
+| `docs/ARCHITECTURE.md`               | Architecture and analyzer plugin interface |
+| `docs/CLI.md`                        | Complete command reference                 |
+| `docs/SECURITY_MODEL.md`             | Isolation and threat model                 |
+| `docs/FINDINGS_AND_RISK.md`          | Risk, severity, confidence and validation  |
+| `docs/SUPPORTED_TARGETS.md`          | Capability matrix                          |
+| `docs/TROUBLESHOOTING.md`            | Common issues                              |
+| `docs/BlueLine_Project_Proposal.pdf` | Project proposal                           |
 
 ---
 
@@ -835,9 +883,13 @@ Languages such as:
 
 ```text
 Dart
+
 Elixir
+
 Haskell
+
 C#
+
 Perl
 ```
 
@@ -861,9 +913,13 @@ It does not perform:
 
 ```text
 Authentication attacks
+
 Session testing
+
 Injection testing
+
 Crawling
+
 State-changing requests
 ```
 
@@ -898,6 +954,7 @@ It is not bundled with BlueLine.
 
 <table>
 <tr>
+
 <td align="center" width="25%">
 
 ### 🚫
@@ -905,6 +962,7 @@ It is not bundled with BlueLine.
 **Don't silently skip**
 
 </td>
+
 <td align="center" width="25%">
 
 ### 🧠
@@ -912,6 +970,7 @@ It is not bundled with BlueLine.
 **Don't fabricate**
 
 </td>
+
 <td align="center" width="25%">
 
 ### 🔍
@@ -919,6 +978,7 @@ It is not bundled with BlueLine.
 **Don't hide failures**
 
 </td>
+
 <td align="center" width="25%">
 
 ### ✅
@@ -926,6 +986,7 @@ It is not bundled with BlueLine.
 **Verify claims**
 
 </td>
+
 </tr>
 </table>
 
@@ -939,6 +1000,7 @@ BlueLine is built around a simple idea:
 
 ```text
 BlueLine/
+
 │
 ├── app/
 │   ├── analyzers/
@@ -962,14 +1024,17 @@ BlueLine/
 ├── packaging/
 │   └── build_windows.bat
 │
-└── requirements.txt
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
 <div align="center">
 
-# 🔵 BlueLine
+<img src="./ui/static/assets/blueline_256.png" width="110" alt="BlueLine logo" />
+
+# BlueLine
 
 ### Security analysis without pretending.
 
