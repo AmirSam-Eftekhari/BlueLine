@@ -1,250 +1,982 @@
-# BlueLine — Universal Security & Reliability Assessment Platform
+<div align="center">
 
-*Assume nothing. Test aggressively. Prove what you find.*
+# 🔵 BlueLine
 
-BlueLine is an offline-first tool that profiles a target (source
-repository, script, or executable), runs every analyzer that genuinely
-applies to it, and reports findings with separate severity, confidence,
-and validation-status fields — plus an honest account of what was and
-wasn't tested. No target data leaves your machine.
+### Universal Security & Reliability Assessment Platform
 
-## What's real in this build
+**Assume nothing. Test aggressively. Prove what you find.**
 
-Everything below is implemented and covered by an automated test in
-`tests/` — nothing here is a stub, a mock, or a hand-picked demo:
+<br>
 
-- **Target discovery** — language/build-system/package-manager/entry-point
-  detection from the actual filesystem.
-- **Python static analysis** (`FULL_SUPPORT`) — real AST-based rule engine,
-  ~15 rule classes (injection, insecure deserialization, weak crypto,
-  hardcoded secrets, path traversal, Flask misconfig, etc.), with basic
-  same-function taint tracking for SQL-injection detection.
-- **JavaScript/TypeScript, Java, Go, Ruby, PHP, Rust, Kotlin, Swift, and
-  Scala static analysis** (`PARTIAL_SUPPORT`) — pattern-based, not full
-  parsers (see Limitations), each with 6-10 real rules covering
-  injection, weak crypto, hardcoded secrets, and language-specific
-  issues (TLS misconfig, XXE, LFI, unsafe deserialization, object
-  injection, unsafe/transmute, force-unwrap panics, etc.).
-- **C/C++ static analysis** (`EXPERIMENTAL`) — pattern-matching on a
-  small set of classically dangerous libc calls, deliberately low
-  confidence.
-- **Web/API analysis** (`PARTIAL_SUPPORT`) — real, read-only HTTP checks
-  (GET/HEAD/OPTIONS only, never state-changing) against a live URL
-  target: missing security headers, insecure cookie flags, CORS
-  misconfiguration (verified by actually sending a probe `Origin` header
-  and checking whether the server reflects it), server-banner
-  disclosure, and plaintext-HTTP transport. Point BlueLine at
-  `http://host:port/` instead of a filesystem path to use it. Not a full
-  active vulnerability scanner — no auth/session/injection testing
-  against live endpoints in this build.
-- **Binary/executable analysis** (`PARTIAL_SUPPORT`) — a real ELF parser
-  (built on Python's stdlib `struct`, no external dependency) extracts
-  architecture, PIE/no-PIE, stripped/not-stripped, and dynamically
-  linked library dependencies. Validated against `readelf`/`file`
-  ground truth on 5 real compiled binaries (normal, static, stripped,
-  PIE, non-PIE) with an exact match on every property, then
-  stress-tested with 500 randomly truncated/corrupted variants of a
-  real binary with zero crashes. PE (Windows) header metadata (machine
-  type, subsystem, section count, timestamp) is also parsed — validated
-  against a synthetic, byte-exact spec-conformant PE64 fixture, since no
-  real Windows binary was available in this build environment; the PE
-  import table (linked DLLs) is not parsed. Also extracts strings from
-  any executable format to catch embedded private keys and hardcoded
-  secrets. Mach-O (macOS) gets string extraction only.
-- **Dependency analysis** — parses `requirements.txt`/`package.json`,
-  checked against a small curated local sample of real historical CVEs.
-  Never fabricates a CVE for a package outside that sample.
-- **Configuration analysis** — `.env` secret detection, Dockerfile
-  misconfiguration checks.
-- **Dynamic analysis & fuzzing** — real subprocess sandboxing (CPU/memory
-  limits, process-group isolation, timeout handling) and real black-box
-  mutation-based fuzzing. Verified to find a planted crash independently
-  via both engines, which the correlation layer then merges into one
-  `CONFIRMED` finding. Dynamic analysis (not fuzzing, for performance
-  reasons — see Limitations) also monitors file and network activity via
-  `psutil` polling against the real running process, validated against
-  real subprocesses that actually open a file and actually connect to a
-  local TCP listener, both correctly detected end-to-end through the
-  full orchestrator. Fuzzing is behavior-guided across generations: an
-  input that reaches an observably new program behavior gets mutated
-  further in the next generation instead of every generation only
-  mutating the original static seeds — proven, not just implemented, by
-  a head-to-head test against a deliberately staged two-condition bug
-  where the old flat approach found it in 0/5 trials and the new
-  generational approach found it reliably (see
-  `tests/test_fuzzing_generational.py`).
-- **Risk engine** — transparent, documented formula (see
-  `app/core/risk.py`); severity and confidence are always shown
-  separately, never conflated.
-- **Coverage engine** — reports what fraction of applicable analysis
-  actually ran; a failed analyzer stage shows 0% for that stage, not a
-  silently-inflated total.
-- **Finding correlation** — deduplicates and merges findings from
-  multiple detectors into one root issue.
-- **Persistence** — SQLite-backed scan history, thread-safe (a real
-  concurrency bug here was caught and fixed during development —
-  see `docs/ARCHITECTURE.md`). Stored in a proper per-user app-data
-  directory, never next to the executable or tied to the current
-  working directory — this is what makes the packaged `.exe` a true
-  single standalone file (see Windows `.exe` note below).
-- **Structured logging** — five separate JSON-lines log streams
-  (application, scanner, analyzer, security, runtime) in your user data
-  directory, verified to actually get written during a real scan, and
-  verified to never leak finding evidence/secret strings into the
-  security log (metadata only — finding ID, category, location).
-- **Reporting** — HTML, JSON, SARIF 2.1.0, CSV, and PDF, all genuinely
-  generated from real scan data. The HTML report includes real,
-  data-driven SVG charts (severity donut, coverage bars) — verified by
-  actually rendering the report to an image and inspecting it (see
-  `docs/ARCHITECTURE.md`), not just by inspecting the generating code.
-  PDF export reuses that same HTML/CSS (converted via `wkhtmltopdf`, a
-  system binary) rather than a separate template — verified by
-  generating a real multi-page PDF from a real scan and rendering it
-  back to an image to confirm it looks right, with a clear, catchable
-  error (never a crash) if `wkhtmltopdf` isn't installed.
-- **CLI** — `scan`, `report`, `compare`, `history`, with CI-friendly exit
-  codes.
-- **Local web UI** — served by a Flask API bound to `127.0.0.1` only;
-  every screen calls the real API, no mock data anywhere. Includes a
-  live severity-breakdown chart on the Findings screen, built from the
-  same math as the report's chart (independently verified in Node's V8
-  engine — see `docs/ARCHITECTURE.md`). Accessibility was checked, not
-  assumed: WCAG AA color-contrast ratios are computed directly from the
-  live CSS (`tests/test_accessibility.py`, which caught and fixed a real
-  4.5:1-vs-3.6:1 failure in the muted-text color on both themes), nav
-  items and finding toggles are real `<button>`s with keyboard support
-  and `aria-expanded`/`aria-current` state, the scan profile picker uses
-  real radio inputs, and live scan updates go through `aria-live`
-  regions.
-- **Orchestrator error isolation** — a deliberately broken analyzer in
-  the test suite proves one bad analyzer cannot crash the whole scan.
+[![Offline First](https://img.shields.io/badge/Architecture-Offline--First-111827?style=for-the-badge)](#)
+[![Python](https://img.shields.io/badge/Python-3.x-111827?style=for-the-badge\&logo=python\&logoColor=3776AB)](#)
+[![Security](https://img.shields.io/badge/Focus-Security-111827?style=for-the-badge\&logo=shield\&logoColor=22C55E)](#)
+[![Testing](https://img.shields.io/badge/Testing-Automated-111827?style=for-the-badge\&logo=pytest\&logoColor=F59E0B)](#)
 
-Run `python -m unittest discover -s tests -v` to see all of this for
-yourself, including a genuine detection benchmark
-(`tests/test_benchmark.py`) against intentionally-vulnerable fixtures in
-`test-targets/`.
+<br>
 
-## Installation
+**Static Analysis · Dynamic Analysis · Fuzzing · Binary Analysis · Web Security · Risk · Reporting**
+
+</div>
+
+---
+
+## ⚡ What is BlueLine?
+
+**BlueLine** is an offline-first security and reliability assessment platform for:
+
+```text
+Source repositories   Scripts   Executables   Live Web Targets
+```
+
+BlueLine discovers what a target actually is, determines which analysis capabilities genuinely apply, runs them, correlates their results, and produces evidence-backed findings.
+
+Every finding keeps these concepts separate:
+
+```text
+Severity       Confidence       Validation       Risk       Coverage
+```
+
+That distinction matters.
+
+> **Not finding a vulnerability is not the same as proving that a target is safe.**
+
+BlueLine therefore reports not only **what it found**, but also **what it tested and what it could not test**.
+
+**No target data leaves your machine.**
+
+---
+
+<div align="center">
+
+### 🧠 The Core Idea
+
+> **Don't silently skip.**
+> **Don't fabricate intelligence.**
+> **Don't hide failures.**
+> **Don't call it verified without verification.**
+
+</div>
+
+---
+
+# 🧩 Analysis Stack
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🔎 Static Analysis
+
+* Python AST engine
+* JavaScript / TypeScript
+* Java
+* Go
+* Ruby
+* PHP
+* Rust
+* Kotlin
+* Swift
+* Scala
+* Experimental C / C++
+
+</td>
+<td width="50%" valign="top">
+
+### 🧪 Runtime Analysis
+
+* Dynamic execution
+* Resource limits
+* Process isolation
+* File activity monitoring
+* Network activity monitoring
+* Behavior-guided fuzzing
+* Crash detection
+* Finding correlation
+
+</td>
+</tr>
+
+<tr>
+<td width="50%" valign="top">
+
+### ⚙️ Binary & Dependency Analysis
+
+* ELF parsing
+* PE metadata
+* Mach-O string extraction
+* Architecture detection
+* PIE detection
+* Stripped binary detection
+* Dependency inspection
+* Local CVE matching
+* Embedded secret extraction
+
+</td>
+<td width="50%" valign="top">
+
+### 🌐 Web & Configuration
+
+* HTTP security headers
+* Cookie flags
+* CORS probing
+* Server banner disclosure
+* Plaintext HTTP detection
+* `.env` secrets
+* Dockerfile checks
+* Package configuration analysis
+
+</td>
+</tr>
+</table>
+
+---
+
+# 🏗️ Architecture
+
+```text
+                         ┌─────────────────────────┐
+                         │         TARGET          │
+                         │ Repo / Script / EXE / URL│
+                         └────────────┬────────────┘
+                                      │
+                                      ▼
+                         ┌─────────────────────────┐
+                         │    TARGET DISCOVERY     │
+                         │ Language · Build System  │
+                         │ Package · Entry Point   │
+                         └────────────┬────────────┘
+                                      │
+                                      ▼
+                   ┌────────────────────────────────────┐
+                   │          ORCHESTRATION             │
+                   └───────┬────────┬────────┬──────────┘
+                           │        │        │
+             ┌─────────────┘        │        └─────────────┐
+             ▼                      ▼                      ▼
+      ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+      │   STATIC    │       │   DYNAMIC   │       │   BINARY    │
+      │   ANALYSIS  │       │   ANALYSIS  │       │   ANALYSIS  │
+      └──────┬──────┘       └──────┬──────┘       └──────┬──────┘
+             │                     │                     │
+             └──────────────┬──────┴──────┬──────────────┘
+                            │             │
+                            ▼             ▼
+                     ┌────────────┐  ┌────────────┐
+                     │  FUZZING   │  │  WEB/API   │
+                     └─────┬──────┘  └─────┬──────┘
+                           │                │
+                           └───────┬────────┘
+                                   ▼
+                         ┌─────────────────────┐
+                         │ FINDING CORRELATION │
+                         │ Deduplicate · Merge │
+                         └──────────┬──────────┘
+                                    │
+                    ┌───────────────┼────────────────┐
+                    ▼               ▼                ▼
+              ┌──────────┐   ┌────────────┐   ┌────────────┐
+              │   RISK   │   │  COVERAGE  │   │ VALIDATION │
+              │  ENGINE  │   │   ENGINE   │   │   STATUS   │
+              └────┬─────┘   └─────┬──────┘   └─────┬──────┘
+                   │               │                │
+                   └───────────────┼────────────────┘
+                                   ▼
+                         ┌─────────────────────┐
+                         │      REPORTING      │
+                         │ HTML · JSON · SARIF │
+                         │ CSV · PDF           │
+                         └─────────────────────┘
+```
+
+---
+
+# 🛡️ Capability Matrix
+
+| Target / Analyzer       |      Capability      |
+| :---------------------- | :------------------: |
+| Python                  |   🟢 `FULL_SUPPORT`  |
+| JavaScript / TypeScript | 🟡 `PARTIAL_SUPPORT` |
+| Java                    | 🟡 `PARTIAL_SUPPORT` |
+| Go                      | 🟡 `PARTIAL_SUPPORT` |
+| Ruby                    | 🟡 `PARTIAL_SUPPORT` |
+| PHP                     | 🟡 `PARTIAL_SUPPORT` |
+| Rust                    | 🟡 `PARTIAL_SUPPORT` |
+| Kotlin                  | 🟡 `PARTIAL_SUPPORT` |
+| Swift                   | 🟡 `PARTIAL_SUPPORT` |
+| Scala                   | 🟡 `PARTIAL_SUPPORT` |
+| C / C++                 |   🟠 `EXPERIMENTAL`  |
+| ELF                     | 🟡 `PARTIAL_SUPPORT` |
+| PE                      | 🟡 `PARTIAL_SUPPORT` |
+| Mach-O                  | 🟡 `PARTIAL_SUPPORT` |
+| Web / API               | 🟡 `PARTIAL_SUPPORT` |
+
+Unsupported targets are **explicitly reported**.
+
+They are never silently skipped.
+
+---
+
+# 🐍 Python Static Analysis
+
+Python receives the deepest static analysis implementation.
+
+BlueLine uses a real **AST-based rule engine** with approximately 15 rule classes covering:
+
+* SQL injection
+* Command injection
+* Insecure deserialization
+* Weak cryptography
+* Hardcoded secrets
+* Path traversal
+* Flask misconfiguration
+* Dangerous function usage
+* Security-sensitive configuration
+
+The SQL injection engine also performs **same-function taint tracking**, allowing potentially unsafe data flow to be connected to SQL execution.
+
+---
+
+# 🌐 Web / API Analysis
+
+BlueLine can analyze a live HTTP target:
+
+```text
+http://host:port/
+```
+
+The analyzer is deliberately **read-only**.
+
+Allowed methods:
+
+```text
+GET   HEAD   OPTIONS
+```
+
+Checks include:
+
+* Security headers
+* Cookie security flags
+* CORS behavior
+* Server banner disclosure
+* Plaintext HTTP transport
+
+CORS is actively verified by sending an `Origin` probe and checking the server's response.
+
+This is **not** intended to be a full active web vulnerability scanner.
+
+No authentication attacks, session attacks, injection testing, or state-changing requests are performed.
+
+---
+
+# 💻 Binary Analysis
+
+## ELF
+
+BlueLine contains a native ELF parser implemented using Python's standard-library `struct`.
+
+It extracts:
+
+```text
+Architecture
+PIE / non-PIE
+Stripped / non-stripped
+Dynamic library dependencies
+```
+
+Validation was performed against `readelf` and `file` using five real binaries:
+
+```text
+Normal
+Static
+Stripped
+PIE
+Non-PIE
+```
+
+Every tested property matched ground truth exactly.
+
+The parser was additionally stress-tested against:
+
+> **500 randomly truncated / corrupted variants**
+
+with:
+
+> **0 crashes**
+
+---
+
+## Windows PE
+
+Current PE analysis extracts:
+
+* Machine type
+* Subsystem
+* Section count
+* Timestamp
+
+Validation was performed against a synthetic, byte-exact PE64 fixture.
+
+PE import-table parsing is not currently implemented.
+
+---
+
+## macOS Mach-O
+
+Mach-O targets currently receive string extraction.
+
+---
+
+# 🧪 Dynamic Analysis
+
+BlueLine executes targets under controlled subprocess conditions:
+
+```text
+CPU limits
+Memory limits
+Timeout handling
+Process-group isolation
+```
+
+Runtime activity can also be monitored.
+
+### File activity
+
+A real subprocess opening a file was detected end-to-end.
+
+### Network activity
+
+A real subprocess connecting to a local TCP listener was also detected end-to-end.
+
+The monitoring layer uses `psutil` polling.
+
+---
+
+# 💥 Behavior-Guided Fuzzing
+
+BlueLine's fuzzer is not simply:
+
+```text
+seed → mutate → seed → mutate → seed → ...
+```
+
+Instead, it promotes inputs that produce **new observable behavior**.
+
+```text
+             ┌─────────────┐
+             │ Seed Corpus │
+             └──────┬──────┘
+                    ▼
+               ┌─────────┐
+               │ Mutate  │
+               └────┬────┘
+                    ▼
+               ┌─────────┐
+               │ Execute │
+               └────┬────┘
+                    ▼
+             ┌─────────────┐
+             │ New Behavior│
+             │   observed? │
+             └──────┬──────┘
+                    │
+              ┌─────┴─────┐
+             YES          NO
+              │            │
+              ▼            ▼
+        Next Generation   Discard
+```
+
+The generational strategy was tested against a deliberately staged two-condition bug.
+
+| Strategy              |      Detection |
+| :-------------------- | -------------: |
+| Flat mutation         | `0 / 5` trials |
+| Generational mutation |       Reliable |
+
+This behavior is backed by an automated test:
+
+```text
+tests/test_fuzzing_generational.py
+```
+
+---
+
+# 🔗 Finding Correlation
+
+Multiple analyzers can independently identify the same root issue.
+
+BlueLine merges those results instead of producing redundant findings.
+
+```text
+Static Finding
+       │
+       ├──────────────┐
+       │              │
+       ▼              ▼
+Dynamic Finding    Fuzz Finding
+       │              │
+       └───────┬──────┘
+               ▼
+       ┌───────────────┐
+       │   CORRELATE   │
+       └───────┬───────┘
+               ▼
+       ┌────────────────┐
+       │ Single Root    │
+       │ Issue          │
+       └────────────────┘
+```
+
+A planted crash was independently detected by both static/runtime paths and merged into one:
+
+```text
+CONFIRMED
+```
+
+finding.
+
+---
+
+# 📐 Risk, Confidence & Validation
+
+BlueLine deliberately keeps these dimensions separate.
+
+### Severity
+
+How serious the potential issue is.
+
+### Confidence
+
+How strongly the evidence supports the finding.
+
+### Validation
+
+Whether the behavior has been independently verified.
+
+### Risk
+
+The calculated aggregate representation defined by the project's documented risk model.
+
+This prevents a common mistake in security tooling:
+
+> **Treating "high severity" and "high confidence" as the same thing.**
+
+See:
+
+```text
+docs/FINDINGS_AND_RISK.md
+```
+
+---
+
+# 📊 Coverage Engine
+
+BlueLine reports what percentage of **applicable analysis actually ran**.
+
+If an analyzer fails:
+
+```text
+Analyzer failure
+      ↓
+Stage coverage = 0%
+      ↓
+Failure remains visible
+```
+
+The scan cannot quietly become "more complete" because a component failed.
+
+Capability and limitation information is also surfaced in:
+
+* Target Setup
+* Settings
+* Generated reports
+
+---
+
+# 🗃️ Persistence
+
+Scan history is stored in SQLite.
+
+The storage layer is:
+
+* Thread-safe
+* Per-user
+* Independent of the executable location
+* Independent of the current working directory
+
+Windows:
+
+```text
+%LOCALAPPDATA%\BlueLine
+```
+
+This allows the packaged application to remain a true standalone executable.
+
+```text
+BlueLine.exe
+     │
+     ├── can be moved
+     ├── can run from read-only locations
+     └── does not require a companion data folder
+```
+
+Scans can be deleted individually or cleared completely.
+
+```bash
+blueline delete <scan_id>
+blueline delete --all
+```
+
+---
+
+# 📝 Structured Security Logging
+
+BlueLine maintains five independent JSON-lines streams:
+
+```text
+application.log
+scanner.log
+analyzer.log
+security.log
+runtime.log
+```
+
+The security stream intentionally contains metadata rather than sensitive evidence.
+
+It records things such as:
+
+```text
+Finding ID
+Category
+Location
+```
+
+but does **not** leak:
+
+```text
+Secret values
+Finding evidence
+Sensitive target contents
+```
+
+This behavior is verified during real scans.
+
+---
+
+# 📄 Reporting
+
+BlueLine generates:
+
+| Format      | Status |
+| :---------- | :----: |
+| HTML        |    ✅   |
+| JSON        |    ✅   |
+| SARIF 2.1.0 |    ✅   |
+| CSV         |    ✅   |
+| PDF         |    ✅   |
+
+### HTML Reports
+
+Reports contain data-driven SVG visualizations:
+
+* Severity distribution
+* Coverage breakdown
+
+These are generated from real scan data and verified by actually rendering the report.
+
+### PDF Reports
+
+PDF generation reuses the same HTML/CSS report through `wkhtmltopdf`.
+
+If `wkhtmltopdf` is unavailable, BlueLine returns a clear error instead of silently failing.
+
+---
+
+# 🖥️ Local Web UI
+
+BlueLine includes a local Flask API and web interface.
+
+The server binds to:
+
+```text
+127.0.0.1
+```
+
+Every screen communicates with the real API.
+
+**No mock data.**
+
+The UI includes:
+
+```text
+Target Setup
+Scan Profiles
+Findings
+Severity Breakdown
+Coverage
+History
+Settings
+Reports
+```
+
+Accessibility is actively tested.
+
+The suite verifies:
+
+* WCAG AA contrast ratios
+* Keyboard navigation
+* Semantic `<button>` controls
+* `aria-expanded`
+* `aria-current`
+* Radio-based scan profile selection
+* `aria-live` regions
+
+The accessibility tests even caught a real contrast failure during development.
+
+---
+
+# ⌨️ CLI
+
+### Scan
+
+```bash
+python -m app.cli scan /path/to/target --profile standard --out report.html
+```
+
+### Report
+
+```bash
+python -m app.cli report <scan_id> --format sarif
+```
+
+### Compare
+
+```bash
+python -m app.cli compare <scan_id_a> <scan_id_b>
+```
+
+### History
+
+```bash
+python -m app.cli history
+```
+
+### Delete
+
+```bash
+python -m app.cli delete <scan_id>
+```
+
+or:
+
+```bash
+python -m app.cli delete --all
+```
+
+The CLI exposes CI-friendly exit codes for automation.
+
+---
+
+# 🚀 Installation
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Running BlueLine
+---
 
-**Web UI (recommended):**
+# ▶️ Running BlueLine
+
+### Web UI
+
 ```bash
 python -m app.api_server
-# then open http://127.0.0.1:8642 in your browser
 ```
 
-**Desktop window** (opens a native window if `pywebview` is installed,
-otherwise falls back to your default browser — see Limitations):
+Then open:
+
+```text
+http://127.0.0.1:8642
+```
+
+### Native Desktop Window
+
 ```bash
-pip install pywebview   # optional, for a native window
+pip install pywebview
 python -m app.desktop_launcher
 ```
 
-**CLI:**
-```bash
-python -m app.cli scan /path/to/target --profile standard --out report.html
-python -m app.cli report <scan_id> --format sarif
-python -m app.cli compare <scan_id_a> <scan_id_b>
-python -m app.cli history
+If `pywebview` is unavailable, BlueLine falls back to the default browser.
+
+### Windows Executable
+
+Build using:
+
+```text
+packaging/build_windows.bat
 ```
 
-**Windows `.exe`:** see `packaging/build_windows.bat` — run it on a
-Windows machine (see Limitations for why it can't be built here). It
-produces a single standalone `dist\BlueLine.exe` — no accompanying
-folder or files to ship alongside it. Scan history is stored in your
-OS's per-user app-data directory (`%LOCALAPPDATA%\BlueLine` on Windows),
-not next to the executable, so the `.exe` can be moved or run from
-anywhere, including a read-only location.
+Expected output:
 
-## Limitations — read this before trusting a scan
+```text
+dist/
+└── BlueLine.exe
+```
 
-BlueLine tells you what it tested, not that your code is safe. Specific,
-current limitations of this build:
+The executable is designed as a standalone file.
 
-1. **JavaScript/TypeScript analysis is regex/pattern-based**, not a real
-   AST parser. It will miss issues a real parser would catch (e.g. a
-   destructured `const { exec } = require('child_process')` followed by
-   a bare `exec(...)` call is not currently recognized) and can
-   false-positive on matches inside strings/comments.
-2. **C/C++ analysis is experimental** — pattern-matching on ~6 dangerous
-   libc calls only, no real parser, no data-flow analysis. Expect both
-   false negatives and false positives.
-3. **Dependency vulnerability data is a small local sample** (12 entries,
-   see `app/analyzers/dependency.py`), not a live feed. A package not
-   flagged has NOT been verified safe — it may simply not be in the
-   sample. Wire `VulnerabilityFeed` to a real source (OSV.dev, GitHub
-   Advisory DB) for production use.
-4. **Fuzzing has no code-coverage feedback** (no compile-time
-   instrumentation of the target) — but it IS behavior-guided across
-   generations, mutating inputs that reach a new observable program
-   behavior rather than only ever mutating the original static seeds.
-   It will reliably find bugs reachable by its mutation corpus (boundary
-   values, malformed structures, oversized/null-byte input, etc.) and
-   staged bugs reachable by combining two of those in sequence, but not
-   bugs that need a specific, non-obvious input with no observable
-   intermediate signal to reach. A target that echoes its input back
-   verbatim can make many inputs look "new" to the behavior-guided
-   corpus; growth is capped per generation to bound the resulting
-   overhead rather than let it consume the whole time budget. Fuzzing
-   also does NOT monitor file/network activity (only single-run Dynamic
-   Analysis does) — a deliberate tradeoff, since polling every one of
-   potentially thousands of fuzz cases would add meaningful overhead.
-5. **File/network activity monitoring is polling-based** (every 30ms via
-   `psutil`), not a kernel-level hook (no ptrace/eBPF) — a file opened
-   and closed faster than the poll interval can be missed. This is a
-   real, stated limitation, not a hidden one.
-6. **No analyzers for niche/less common languages** (Dart, Elixir,
-   Haskell, C#, Perl, etc.) — 11 languages now have real analyzers
-   (Python full; JS/TS, Java, Go, Ruby, PHP, Rust, Kotlin, Swift, Scala
-   partial; C/C++ experimental). Anything else is detected by target
-   discovery but explicitly marked `UNSUPPORTED`, never silently skipped.
-7. **Binary analysis: ELF is fully parsed and validated; PE gets header
-   metadata only (no import table); Mach-O gets string extraction only**
-   — see `docs/SUPPORTED_TARGETS.md` for the exact breakdown and why.
-8. **The Web/API analyzer is passive/read-only** — real GET/HEAD/OPTIONS
-   checks for headers, cookies, CORS, transport, and banner disclosure
-   (see above), verified against a live deliberately-misconfigured local
-   test server. It does not test authentication, sessions, or injection
-   against a live endpoint, and does not crawl beyond the single URL given.
-9. **The Windows `.exe` was written but not built or run** in this
-   project's development environment, which had no Windows/mingw
-   toolchain and no network route to `pyinstaller`/`pywebview`. The
-   `.spec` file and build script are ready to run on Windows — see
-   `docs/ARCHITECTURE.md` for the full account of what could and
-   couldn't be verified where.
-10. **The local API server uses Flask's built-in development server**
-   (fine for a single local user; swap in `waitress` if you want a more
-   production-grade local server).
-11. **PDF export depends on the `wkhtmltopdf` system binary being
-   installed** — it isn't bundled with BlueLine (it's a separate OS-level
-   install, not a `pip` package). If it's missing, PDF export returns a
-   clear error naming what to install rather than crashing or silently
-   producing nothing; every other report format is unaffected.
+---
 
-None of this is hidden in the product either — the same capability
-levels and limitations surface in the Target Setup screen, the
-Settings screen, and every generated report.
+# 🧪 Verification
 
-## Project layout
+BlueLine follows a simple engineering principle:
 
-See `docs/ARCHITECTURE.md` for the full architecture writeup, including
-the plugin interface for adding new analyzers.
+<div align="center">
 
-## Further documentation
+### **If a capability is claimed, there should be a test behind it.**
 
-- `docs/CLI.md` — full command reference
-- `docs/SECURITY_MODEL.md` — sandboxing, isolation, and what BlueLine
-  does (and doesn't) do when analyzing untrusted targets
-- `docs/FINDINGS_AND_RISK.md` — how to read severity, confidence,
-  validation status, the risk formula, and coverage
-- `docs/SUPPORTED_TARGETS.md` — the full target-type and language
-  capability matrix
-- `docs/TROUBLESHOOTING.md` — common issues and how to resolve them
-- `docs/ARCHITECTURE.md` — plugin interface, directory layout, and an
-  honest account of what could and couldn't be verified in this build's
-  development environment
+</div>
+
+Run the complete suite:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The suite covers:
+
+```text
+Target discovery
+Static analysis
+Binary parsing
+Corrupted binaries
+Dependency detection
+Web/API checks
+Dynamic execution
+Fuzzing
+Generational fuzzing
+Finding correlation
+Risk calculation
+Coverage
+Persistence
+Concurrency
+Structured logging
+HTML reporting
+PDF reporting
+Accessibility
+CLI behavior
+Windows packaging
+Analyzer failure isolation
+Detection benchmarks
+```
+
+Intentionally vulnerable targets are maintained under:
+
+```text
+test-targets/
+```
+
+---
+
+# 📚 Documentation
+
+| Document                    | Purpose                                    |
+| :-------------------------- | :----------------------------------------- |
+| `docs/ARCHITECTURE.md`      | Architecture and analyzer plugin interface |
+| `docs/CLI.md`               | Complete command reference                 |
+| `docs/SECURITY_MODEL.md`    | Isolation and threat model                 |
+| `docs/FINDINGS_AND_RISK.md` | Risk, severity, confidence and validation  |
+| `docs/SUPPORTED_TARGETS.md` | Capability matrix                          |
+| `docs/TROUBLESHOOTING.md`   | Common issues                              |
+
+---
+
+# ⚠️ Limitations
+
+<details>
+<summary><strong>Read before trusting a scan</strong></summary>
+
+<br>
+
+BlueLine is deliberately transparent about its boundaries.
+
+### JavaScript / TypeScript
+
+Pattern-based analysis rather than a complete AST parser.
+
+This can produce both false positives and false negatives.
+
+### C / C++
+
+Experimental pattern-based analysis with limited rules and no complete data-flow engine.
+
+### Dependency Intelligence
+
+The bundled vulnerability database is a small local dataset containing 12 historical CVE entries.
+
+A package that is not flagged is **not proven safe**.
+
+### Fuzzing
+
+No code-coverage instrumentation is currently used.
+
+Behavior-guided generation improves exploration, but highly specific bugs with no observable intermediate behavior can remain undiscovered.
+
+### Runtime Monitoring
+
+File/network monitoring is polling-based at approximately 30 ms intervals.
+
+Very short-lived activity may be missed.
+
+### Language Coverage
+
+Languages such as:
+
+```text
+Dart
+Elixir
+Haskell
+C#
+Perl
+```
+
+are currently unsupported.
+
+They are explicitly reported as `UNSUPPORTED`.
+
+### Binary Analysis
+
+ELF receives the deepest binary analysis.
+
+PE currently provides header metadata but does not parse the import table.
+
+Mach-O currently receives string extraction.
+
+### Web Analysis
+
+The web analyzer is deliberately passive/read-only.
+
+It does not perform:
+
+```text
+Authentication attacks
+Session testing
+Injection testing
+Crawling
+State-changing requests
+```
+
+### Windows Packaging
+
+The development environment did not provide a Windows/mingw toolchain, so the final executable could not be built and executed directly in the development environment.
+
+A real Windows build exposed two actual issues:
+
+1. An obsolete `cipher=` PyInstaller parameter.
+2. Missing build-script error handling.
+
+Both were fixed and both failure modes are covered by automated tests.
+
+### Local API Server
+
+The Flask development server is suitable for a single local user.
+
+For a more production-oriented local deployment, a WSGI server such as `waitress` can be substituted.
+
+### PDF
+
+PDF export requires the system-level `wkhtmltopdf` executable.
+
+It is not bundled with BlueLine.
+
+</details>
+
+---
+
+# 🔐 Design Principles
+
+<table>
+<tr>
+<td align="center" width="25%">
+
+### 🚫
+
+**Don't silently skip**
+
+</td>
+<td align="center" width="25%">
+
+### 🧠
+
+**Don't fabricate**
+
+</td>
+<td align="center" width="25%">
+
+### 🔍
+
+**Don't hide failures**
+
+</td>
+<td align="center" width="25%">
+
+### ✅
+
+**Verify claims**
+
+</td>
+</tr>
+</table>
+
+BlueLine is built around a simple idea:
+
+> A security tool should be honest about both its **findings** and its **blind spots**.
+
+---
+
+# 📁 Project Structure
+
+```text
+BlueLine/
+│
+├── app/
+│   ├── analyzers/
+│   ├── core/
+│   ├── ...
+│   ├── api_server.py
+│   ├── cli.py
+│   └── desktop_launcher.py
+│
+├── tests/
+├── test-targets/
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── BlueLine_Project_Proposal.pdf
+│   ├── CLI.md
+│   ├── FINDINGS_AND_RISK.md
+│   ├── SECURITY_MODEL.md
+│   ├── SUPPORTED_TARGETS.md
+│   └── TROUBLESHOOTING.md
+│
+├── packaging/
+│   └── build_windows.bat
+│
+└── requirements.txt
+```
+
+---
+
+<div align="center">
+
+# 🔵 BlueLine
+
+### Security analysis without pretending.
+
+**Assume nothing. Test aggressively. Prove what you find.**
+
+<br>
+
+`Static` · `Dynamic` · `Fuzzing` · `Binary` · `Web` · `Risk` · `Reporting`
+
+</div>

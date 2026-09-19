@@ -150,6 +150,50 @@ def history(target, db):
                    f"L:{r['low_count']}  coverage={r['overall_coverage']}%")
 
 
+@cli.command()
+@click.argument("scan_id", required=False)
+@click.option("--all", "delete_all_flag", is_flag=True, default=False,
+              help="Delete ALL scan history instead of a single scan.")
+@click.option("--target", default=None,
+              help="With --all, only delete history for this specific target path.")
+@click.option("--yes", is_flag=True, default=False, help="Skip the confirmation prompt.")
+@click.option("--db", default=DEFAULT_DB_PATH)
+def delete(scan_id, delete_all_flag, target, yes, db):
+    """Delete a scan from history, or clear all history with --all.
+
+    Examples:
+        blueline delete scan_968e1d8971
+        blueline delete --all
+        blueline delete --all --target /path/to/project
+    """
+    if not delete_all_flag and not scan_id:
+        click.echo("Provide a SCAN_ID to delete, or pass --all to clear history.", err=True)
+        sys.exit(2)
+    if delete_all_flag and scan_id:
+        click.echo("Pass either a SCAN_ID or --all, not both.", err=True)
+        sys.exit(2)
+
+    store = ScanStore(db)
+    try:
+        if delete_all_flag:
+            scope = f" for target {target}" if target else ""
+            if not yes:
+                click.confirm(f"Delete ALL scan history{scope}? This cannot be undone.", abort=True)
+            count = store.delete_all(target_path=target)
+            click.echo(f"Deleted {count} scan(s){scope}.")
+        else:
+            if not yes:
+                click.confirm(f"Delete scan {scan_id}? This cannot be undone.", abort=True)
+            deleted = store.delete(scan_id)
+            if deleted:
+                click.echo(f"Deleted {scan_id}.")
+            else:
+                click.echo(f"No scan found with ID {scan_id} — nothing to delete.", err=True)
+                sys.exit(2)
+    finally:
+        store.close()
+
+
 def _scan_result_from_dict(data: dict):
     """Reconstruct a ScanResult-like object good enough for report generation
     from persisted JSON (avoids re-deriving full dataclasses from raw dicts

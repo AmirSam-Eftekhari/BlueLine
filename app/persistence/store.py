@@ -83,6 +83,25 @@ class ScanStore:
             return None
         return json.loads(row[0])
 
+    def delete(self, scan_id: str) -> bool:
+        """Deletes one scan from history. Returns True if a scan with
+        that ID existed and was deleted, False if there was nothing to delete."""
+        with self._lock:
+            cur = self._conn.execute("DELETE FROM scans WHERE scan_id = ?", (scan_id,))
+            self._conn.commit()
+            return cur.rowcount > 0
+
+    def delete_all(self, target_path: Optional[str] = None) -> int:
+        """Deletes ALL scan history, or (if target_path is given) only
+        history for that specific target. Returns the number of scans deleted."""
+        with self._lock:
+            if target_path:
+                cur = self._conn.execute("DELETE FROM scans WHERE target_path = ?", (target_path,))
+            else:
+                cur = self._conn.execute("DELETE FROM scans")
+            self._conn.commit()
+            return cur.rowcount
+
     def list_history(self, target_path: Optional[str] = None, limit: int = 50) -> list[dict]:
         with self._lock:
             if target_path:

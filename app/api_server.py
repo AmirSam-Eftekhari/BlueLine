@@ -147,10 +147,26 @@ def scan_report(scan_id):
     return app.response_class(gen(result), mimetype=mimetype)
 
 
-@app.route("/api/history", methods=["GET"])
+@app.route("/api/history", methods=["GET", "DELETE"])
 def history():
     target = request.args.get("target")
+    if request.method == "DELETE":
+        count = _store.delete_all(target_path=target)
+        with _lock:
+            if target is None:
+                _live_scans.clear()
+        return jsonify({"deleted_count": count})
     return jsonify(_store.list_history(target_path=target))
+
+
+@app.route("/api/scan/<scan_id>", methods=["DELETE"])
+def delete_scan(scan_id):
+    deleted = _store.delete(scan_id)
+    with _lock:
+        _live_scans.pop(scan_id, None)
+    if not deleted:
+        return jsonify({"error": "unknown scan_id"}), 404
+    return jsonify({"deleted": True, "scan_id": scan_id})
 
 
 @app.route("/api/compare", methods=["GET"])

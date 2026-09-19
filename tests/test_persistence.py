@@ -96,6 +96,54 @@ class TestPersistence(unittest.TestCase):
             store.compare("nope_a", "nope_b")
         store.close()
 
+    def test_delete_removes_a_scan_from_history(self):
+        orch = ScanOrchestrator()
+        result = orch.run_scan("delete_test_1", FIXTURE, ScanConfig.for_profile("quick"))
+        store = ScanStore(self.db_path)
+        store.save(result)
+        self.assertIsNotNone(store.load("delete_test_1"))
+
+        deleted = store.delete("delete_test_1")
+        self.assertTrue(deleted)
+        self.assertIsNone(store.load("delete_test_1"))
+        self.assertNotIn("delete_test_1", [r["scan_id"] for r in store.list_history()])
+        store.close()
+
+    def test_delete_of_nonexistent_scan_returns_false_not_an_error(self):
+        store = ScanStore(self.db_path)
+        deleted = store.delete("scan_that_was_never_saved")
+        self.assertFalse(deleted)
+        store.close()
+
+    def test_delete_all_clears_every_scan(self):
+        orch = ScanOrchestrator()
+        store = ScanStore(self.db_path)
+        for i in range(3):
+            result = orch.run_scan(f"delete_all_test_{i}", FIXTURE, ScanConfig.for_profile("quick"))
+            store.save(result)
+        self.assertEqual(len(store.list_history()), 3)
+
+        count = store.delete_all()
+        self.assertEqual(count, 3)
+        self.assertEqual(store.list_history(), [])
+        store.close()
+
+    def test_delete_all_scoped_to_one_target_leaves_others_alone(self):
+        orch = ScanOrchestrator()
+        store = ScanStore(self.db_path)
+        result_a = orch.run_scan("scope_test_a", FIXTURE, ScanConfig.for_profile("quick"))
+        store.save(result_a)
+        # A second, distinct target path so scoped deletion has something to leave alone.
+        other_fixture = str(Path(FIXTURE).parent / "vulnerable-javascript")
+        result_b = orch.run_scan("scope_test_b", other_fixture, ScanConfig.for_profile("quick"))
+        store.save(result_b)
+
+        count = store.delete_all(target_path=result_a.target_profile.target_path)
+        self.assertEqual(count, 1)
+        self.assertIsNone(store.load("scope_test_a"))
+        self.assertIsNotNone(store.load("scope_test_b"))
+        store.close()
+
 
 if __name__ == "__main__":
     unittest.main()

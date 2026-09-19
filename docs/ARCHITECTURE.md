@@ -145,6 +145,80 @@ when you can't get a fully faithful test environment, get as close as
 you honestly can, root-cause anything that looks wrong instead of
 guessing, and say plainly what you could and couldn't verify.
 
+## Two real Windows packaging bugs, found by a real user
+
+Everything in the "Single-file executable requirement" section above
+was reviewed carefully, but reviewing isn't the same as running — this
+project had no Windows machine to actually execute
+`packaging\build_windows.bat` on. A real user did, and reported the
+symptom precisely: **the `dist` folder wasn't created at all.**
+
+That single sentence was enough to diagnose both bugs without needing
+Windows access:
+
+1. **`packaging/blueline.spec` passed `cipher=block_cipher` to both
+   `Analysis()` and `PYZ()`.** A `.spec` file isn't a data file —
+   PyInstaller executes it as a Python script, with `Analysis`, `PYZ`,
+   `EXE` etc. injected as callables. PyInstaller 6.0 (October 2023)
+   removed its bytecode-encryption feature entirely, including the
+   `cipher` keyword argument on both classes. Since any `pip install
+   pyinstaller` done after that date installs a version without it,
+   this raised a `TypeError` the instant the spec file executed —
+   before a single byte reached `dist/`, which is exactly the reported
+   symptom. This was a leftover from an early draft written against an
+   older PyInstaller example and was never actually needed (BlueLine
+   doesn't use or need bytecode encryption). Fixed by removing `cipher=`
+   entirely, along with two other Windows-manifest parameters
+   (`win_no_prefer_redirects`, `win_private_assemblies`) and an
+   unnecessary `runtime_tmpdir=None` that were carried over the same
+   way and added risk without adding anything BlueLine needs.
+
+2. **`build_windows.bat` had essentially no error checking.** Only the
+   test-suite step checked `%errorlevel%` — `pip install`, `pyinstaller
+   --version`, and the `pyinstaller` invocation itself could all fail
+   silently, and the script would still print "Build complete." Fixed:
+   every step now checks its own exit code and stops with a specific,
+   actionable message; the script also verifies `dist\BlueLine.exe`
+   actually exists before declaring success, rather than trusting
+   PyInstaller's own exit code alone. A real, separate bug was caught
+   *while fixing this one*: a line meant to show the user's real
+   `%LOCALAPPDATA%` path used `%%LOCALAPPDATA%%` — correct syntax
+   inside a `FOR` loop, but at the top level of a script it's
+   interpreted as two escaped literal `%` characters, so it would have
+   silently printed the literal text `%LOCALAPPDATA%` instead of the
+   actual resolved path.
+
+**Both fixes are covered by tests that reproduce the actual failure
+mode without needing Windows or PyInstaller installed** — this
+sandbox's fundamental constraint didn't go away, so the verification
+approach had to get more creative, not just "trust the fix this time":
+
+- `tests/test_pyinstaller_spec.py` stubs `Analysis`/`PYZ`/`EXE` with the
+  parameter set current PyInstaller actually accepts (deliberately
+  *not* accepting `cipher`, so a regression would fail this test the
+  same way it failed for real), then `exec()`s the real `.spec` file
+  against those stubs. Building this test caught a bug in the test
+  itself first: the initial stub was missing a `zipfiles` attribute
+  that a real `Analysis` object has and the spec legitimately uses
+  (verified this is real, standard PyInstaller usage — it appears in
+  PyInstaller's own onefile documentation — not another spec bug).
+- `tests/test_build_windows_bat.py` statically checks the batch script
+  for exactly the two bug classes found: every critical command must be
+  followed by an `%errorlevel%` check, and any `%%NAME%%` pattern must
+  actually belong to a `FOR` loop rather than being a mis-escaped
+  top-level variable reference. Writing this test's parenthesis-balance
+  checker surfaced a bug in the checker itself (it didn't understand
+  `) else (`, a construct that both closes and reopens a block on the
+  same line) — fixed before trusting the test's result.
+
+None of this proves the `.exe` now builds and runs cleanly on Windows —
+that still requires an actual Windows machine, which this project still
+doesn't have. What it does prove is that the two specific, reported
+failures are actually fixed, verified by simulation as rigorously as
+this environment allows, and that a regression in either one would be
+caught here rather than only discoverable by the next person who tries
+a real Windows build.
+
 ## Dogfooding: BlueLine scanning its own source code
 
 Late in development, BlueLine was pointed at its own real product

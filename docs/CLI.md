@@ -63,6 +63,32 @@ component + location), not by ID, so the same underlying issue is
 recognized across scans even though each scan generates fresh finding
 IDs.
 
+## `delete` — remove scans from history
+
+```bash
+python -m app.cli delete <scan_id> [--yes] [--db PATH]
+python -m app.cli delete --all [--target PATH] [--yes] [--db PATH]
+```
+
+| Option | Meaning |
+|---|---|
+| `scan_id` | Delete this one scan (omit when using `--all`) |
+| `--all` | Delete ALL scan history instead of a single scan |
+| `--target` | With `--all`, only delete history for this specific target path |
+| `--yes` | Skip the confirmation prompt (for scripts/CI) |
+
+Without `--yes`, both forms ask for confirmation before deleting —
+deletion is permanent, there is no undo. The same capability is
+available from the web UI: a **Delete** button on each scan in the
+Reports screen, and a **Clear All Scan History** button in Settings.
+
+Examples:
+```bash
+python -m app.cli delete scan_968e1d8971
+python -m app.cli delete --all --yes
+python -m app.cli delete --all --target /home/me/myproject --yes
+```
+
 ## `history` — list previous scans
 
 ```bash

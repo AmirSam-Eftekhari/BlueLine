@@ -486,12 +486,41 @@ async function loadReportsList() {
           <a class="btn btn-sm" href="/api/scan/${esc(r.scan_id)}/report?format=sarif" target="_blank">SARIF</a>
           <a class="btn btn-sm" href="/api/scan/${esc(r.scan_id)}/report?format=csv" target="_blank">CSV</a>
           <a class="btn btn-sm" href="/api/scan/${esc(r.scan_id)}/report?format=pdf" target="_blank">PDF</a>
+          <button type="button" class="btn btn-sm btn-danger delete-scan-btn" data-scan-id="${esc(r.scan_id)}">Delete</button>
         </div>
       </div>`).join("");
+    $$(".delete-scan-btn", container).forEach((btn) => {
+      btn.addEventListener("click", () => deleteScan(btn.dataset.scanId));
+    });
   } catch (e) {
     container.innerHTML = `<div class="empty-state">Could not load reports: ${esc(e.message)}</div>`;
   }
 }
+
+async function deleteScan(scanId) {
+  if (!confirm(`Delete scan ${scanId}? This cannot be undone.`)) return;
+  try {
+    await api(`/api/scan/${scanId}`, { method: "DELETE" });
+    loadReportsList();
+    loadRecentScans();
+  } catch (e) {
+    alert(`Could not delete scan: ${e.message}`);
+  }
+}
+
+async function clearAllHistory() {
+  if (!confirm("Delete ALL scan history? This cannot be undone.")) return;
+  try {
+    const resp = await api("/api/history", { method: "DELETE" });
+    alert(`Deleted ${resp.deleted_count} scan(s).`);
+    loadReportsList();
+    loadRecentScans();
+  } catch (e) {
+    alert(`Could not clear history: ${e.message}`);
+  }
+}
+
+$("#clearAllHistoryBtn").addEventListener("click", clearAllHistory);
 
 /* ---------------- Init ---------------- */
 

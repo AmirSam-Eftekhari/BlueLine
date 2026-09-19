@@ -201,8 +201,10 @@
 
         <div class="section-title">Data &amp; Storage</div>
         <div class="card">
-          <p style="margin:0;">Scan history is stored locally in <code>blueline_data.sqlite3</code> next to where
-            the BlueLine engine is run. Delete that file to clear all scan history.</p>
+          <p style="margin:0 0 14px;">Scan history is stored locally in your OS's per-user application-data
+            directory (e.g. <code>%LOCALAPPDATA%\BlueLine</code> on Windows) — never next to wherever the
+            BlueLine engine happens to be run from.</p>
+          <button class="btn btn-danger btn-sm" id="clearAllHistoryBtn">Clear All Scan History</button>
         </div>
 
         <div class="section-title">Known Limitations (this build)</div>

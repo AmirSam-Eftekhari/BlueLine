@@ -53,6 +53,11 @@ the original build environment.
 
 ## Building the Windows `.exe` fails
 
+- **If `dist\` isn't created at all and the error mentions `cipher` or
+  an unexpected keyword argument in `Analysis()`/`PYZ()`:** you have an
+  old copy of `packaging/blueline.spec` from before this was fixed. The
+  fixed spec no longer passes `cipher=` at all (PyInstaller 6.0 removed
+  that parameter entirely) — pull the latest version of this project.
 - Make sure you're running `packaging/build_windows.bat` **on Windows**
   — it can't be cross-compiled from Linux/macOS in this project (no
   `mingw`/Wine dependency was ever introduced specifically to keep this
@@ -60,10 +65,19 @@ the original build environment.
 - The script runs the full test suite before packaging and aborts the
   build if any test fails — if it stops there, fix the failing test
   first; don't skip straight to PyInstaller.
+- The script now checks the exit code of every step and stops with a
+  specific message on the first failure, and verifies
+  `dist\BlueLine.exe` actually exists before declaring success — if
+  you're seeing a silent "Build complete" with no `.exe`, you also have
+  an old copy of `build_windows.bat`.
 - If PyInstaller complains about a missing module, add it to
   `hiddenimports` in `packaging/blueline.spec` — dynamic imports
   (anything imported inside a function rather than at module top level)
   are the most common cause.
+- For anything else, re-run with `pyinstaller packaging\blueline.spec
+  --log-level DEBUG` and read the actual traceback — it names the exact
+  line and error far more precisely than guessing from outside a real
+  Windows/PyInstaller environment ever can.
 
 ## PDF export fails or is missing from the UI
 
