@@ -11,7 +11,7 @@
 <br>
 
 [![Offline First](https://img.shields.io/badge/Architecture-Offline--First-111827?style=for-the-badge)](#)
-[![Python](https://img.shields.io/badge/Python-3.x-111827?style=for-the-badge\&logo=python\&logoColor=3776AB)](#)
+[![Python](https://img.shields.io/badge/Python-3.12-111827?style=for-the-badge\&logo=python\&logoColor=3776AB)](#)
 [![Security](https://img.shields.io/badge/Focus-Security-111827?style=for-the-badge\&logo=shield\&logoColor=22C55E)](#)
 [![Testing](https://img.shields.io/badge/Testing-Automated-111827?style=for-the-badge\&logo=pytest\&logoColor=F59E0B)](#)
 
